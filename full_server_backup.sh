@@ -6,6 +6,18 @@
 BACKUP_DIR="/root/full_server_backup_$(date +%Y%m%d)"
 mkdir -p "$BACKUP_DIR"
 
+# Pārveido Apache -> Nginx (ja konfigi eksistē)
+if [ -d "/etc/apache2" ]; then
+  echo "🔵 Konvertē Apache konfigus uz Nginx formātu..."
+  mkdir -p "$BACKUP_DIR/web/nginx_converted"
+  for site in $(ls /etc/apache2/sites-available/); do
+    if [ "$site" != "000-default.conf" ]; then
+      # Izmanto 'apache2nginx' rīku (instalējam to pirms backup)
+      apache2nginx /etc/apache2/sites-available/$site > "$BACKUP_DIR/web/nginx_converted/${site}.nginx" 2>/dev/null
+    fi
+  done
+fi
+
 # 1. Atslēgas un konfigi (~/.ssh, ~/.config, Docker, Git, GPG, cron)
 mkdir -p "$BACKUP_DIR/keys"
 cp -r ~/.ssh "$BACKUP_DIR/keys/"

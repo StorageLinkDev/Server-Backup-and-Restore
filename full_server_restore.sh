@@ -5,6 +5,18 @@
 
 [ -z "$1" ] && echo "❌ Lietojums: $0 full_server_backup_YYYYMMDD.tar.gz" && exit 1
 
+# =====[ WEB SERVER RESTORE ]=====
+# Ja ir pārveidoti Nginx konfigi no Apache
+if [ -d "$RESTORE_DIR/web/nginx_converted" ]; then
+  echo "🔵 Instalē pārveidotos Nginx konfigus..."
+  sudo apt install -y nginx  # Ja vēl nav instalēts
+  mkdir -p /etc/nginx/conf.d
+  cp "$RESTORE_DIR"/web/nginx_converted/*.nginx /etc/nginx/conf.d/
+  
+  # Pārbauda un restartē
+  sudo nginx -t && sudo systemctl restart nginx
+fi
+
 BACKUP_FILE="$1"
 RESTORE_DIR="/tmp/full_restore_$(date +%s)"
 mkdir -p "$RESTORE_DIR"

@@ -116,4 +116,111 @@ reboot
    - Tāds pats OS (Ubuntu/Debian/CentOS)
    - Instalēti pamata pakotnes (nginx, certbot u.c.)
 
-Ja rodas jautājumi, vaicā! 🚀
+
+
+### **🔄 Izmaiņas, ja pāriet no Apache uz Nginx (backup/restore kontekstā)**
+
+Ja vecajā serverī bija **Apache**, bet jaunajā instalē **Nginx**, ir vajadzīgas šādas korekcijas, lai migrācija notiktu bez problēmām:
+
+---
+
+## **1. Backup Pielāgojumi (`full_server_backup.sh`)**
+Pievieno **konversijas filtrus**, lai automātiski pārveidotu Apache konfigus uz Nginx saderīgu formātu:
+
+```bash
+# =====[ WEB SERVER BACKUP ]=====
+# Pārveido Apache -> Nginx (ja konfigi eksistē)
+if [ -d "/etc/apache2" ]; then
+  echo "🔵 Konvertē Apache konfigus uz Nginx formātu..."
+  mkdir -p "$BACKUP_DIR/web/nginx_converted"
+  for site in $(ls /etc/apache2/sites-available/); do
+    if [ "$site" != "000-default.conf" ]; then
+      # Izmanto 'apache2nginx' rīku (instalējam to pirms backup)
+      apache2nginx /etc/apache2/sites-available/$site > "$BACKUP_DIR/web/nginx_converted/${site}.nginx" 2>/dev/null
+    fi
+  done
+fi
+```
+
+### **Obligāti darbības pirms backup:**
+1. Instalē **apache2nginx** rīku:
+   ```bash
+   sudo apt install -y apache2-utils  # Debian/Ubuntu
+   sudo yum install -y httpd-tools    # CentOS
+   ```
+
+---
+
+## **2. Restore Pielāgojumi (`full_server_restore.sh`)**
+Aizstāj Apache konfigus ar pārveidotajiem Nginx failiem:
+
+```bash
+# =====[ WEB SERVER RESTORE ]=====
+# Ja ir pārveidoti Nginx konfigi no Apache
+if [ -d "$RESTORE_DIR/web/nginx_converted" ]; then
+  echo "🔵 Instalē pārveidotos Nginx konfigus..."
+  sudo apt install -y nginx  # Ja vēl nav instalēts
+  mkdir -p /etc/nginx/conf.d
+  cp "$RESTORE_DIR"/web/nginx_converted/*.nginx /etc/nginx/conf.d/
+  
+  # Pārbauda un restartē
+  sudo nginx -t && sudo systemctl restart nginx
+fi
+```
+
+---
+
+## **3. Būtiskās Izmaiņas Konfigos**
+Nginx neizprot Apache direktīvas, tāpēc konvertējot, mainās:
+
+| **Apache Direktīva**       | **Nginx Ekvivalents**          |
+|---------------------------|-------------------------------|
+| `DocumentRoot /path`      | `root /path;`                |
+| `<VirtualHost *:80>`      | `server { listen 80; ... }`  |
+| `ErrorLog logs/error.log` | `error_log /path/error.log;` |
+| `RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]` | `rewrite ^/(.*)$ /index.php?q=$1 last;` |
+
+---
+
+## **4. Manuālie Pārbaudes Soļi Pēc Restore**
+1. **Pārbauda, vai Nginx apstrādā PHP**:
+   ```nginx
+   location ~ \.php$ {
+     fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
+     include fastcgi_params;
+   }
+   ```
+2. **Atjaunina SSL sertifikātu ceļus** (ja bija Apache `SSLCertificateFile`):
+   ```nginx
+   ssl_certificate /etc/letsencrypt/live/domains/fullchain.pem;
+   ssl_certificate_key /etc/letsencrypt/live/domains/privkey.pem;
+   ```
+3. **Pārliecinies, ka statiskie faili tiek apkalpoti**:
+   ```nginx
+   location /static/ {
+     alias /var/www/html/static/;
+   }
+   ```
+
+---
+
+## **5. Pilns Migrācijas Process**
+```mermaid
+flowchart TD
+    A[Veic pilnu backup ar full_server_backup.sh] --> B[Konvertē Apache konfigus uz Nginx]
+    B --> C[Instalē Nginx jaunajā serverī]
+    C --> D[Restore no backup ar full_server_restore.sh]
+    D --> E[Pārbauda žurnālus: journalctl -u nginx -f]
+```
+
+---
+
+### **⚠️ Svarīgi!**
+- **Neaizstāj vienlaikus abus serverus** — vispirms pārbaudi jauno konfigurāciju.  
+- **Izmanto `nginx -t` pirms restartēšanas**, lai pārbaudītu sintakses kļūdas.  
+- **Migrē pa vienam domēnam**, nevis visus uzreiz.  
+
+Ja rodas kļūdas, pārbaudi:  
+```bash
+sudo tail -100 /var/log/nginx/error.log
+```
