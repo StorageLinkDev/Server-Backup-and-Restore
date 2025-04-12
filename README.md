@@ -224,3 +224,101 @@ Ja rodas kļūdas, pārbaudi:
 ```bash
 sudo tail -100 /var/log/nginx/error.log
 ```
+
+
+### **🔧 Komandas Migrācijai ar Jūsu GitHub Repozitoriju**  
+Tā kā esat ievietojis backup/restore skriptus GitHub ([Trusardi/server_backup_restore](https://github.com/Trusardi/server_backup_restore)), šeit ir **konkrētas komandas**, lai migrētu no vecā servera (ar Apache) uz jauno (ar Nginx):
+
+---
+
+## **1. Vecajā Serverī (Backup)**
+#### **Lejupielādē un palaid backup skriptu no GitHub:**
+```bash
+# Lejupielādē skriptus no GitHub
+git clone git@github.com:Trusardi/server_backup_restore.git
+cd server_backup_restore
+
+# Padara skriptus izpildāmus
+chmod +x full_server_backup.sh
+
+# Instalē nepieciešamos rīkus (Apache -> Nginx konversijai)
+sudo apt install -y apache2-utils  # Debian/Ubuntu
+sudo yum install -y httpd-tools    # CentOS
+
+# Palaid pilnu backup (ar Apache konfigu konversiju uz Nginx)
+./full_server_backup.sh
+```
+**Rezultāts:**  
+Backup fails tiks saglabāts vecajā serverī:  
+`/root/full_server_backup_YYYYMMDD.tar.gz`
+
+---
+
+## **2. Jaunajā Serverī (Restore)**
+#### **Lejupielādē backup un palaid restore:**
+```bash
+# Lejupielādē skriptus no GitHub
+git clone git@github.com:Trusardi/server_backup_restore.git
+cd server_backup_restore
+chmod +x full_server_restore.sh
+
+# Lejupielādē backup failu no vecā servera (izmantojot SCP)
+scp root@vecais_serveris:/root/full_server_backup_*.tar.gz .
+
+# Palaid restore (ar Nginx konfigiem)
+./full_server_restore.sh full_server_backup_YYYYMMDD.tar.gz
+
+# Pārbauda, vai Nginx strādā
+sudo nginx -t && sudo systemctl restart nginx
+```
+
+---
+
+## **3. Pārbaudes Pēc Migrācijas**
+#### **Pārliecinies, ka viss darbojas:**
+```bash
+# Pārbauda Nginx kļūdas
+sudo tail -100 /var/log/nginx/error.log
+
+# Pārbauda, vai PHP darbojas (ja ir)
+curl -I http://localhost/index.php
+
+# Pārbauda SSL sertifikātus
+sudo certbot renew --dry-run
+
+# Pārbauda cron uzdevumus
+crontab -l
+```
+
+---
+
+## **4. Ja Rodas Problēmas**
+#### **Biežākās kļūdas un risinājumi:**
+| **Problēma**                  | **Risinājums**                                                                 |
+|-------------------------------|-------------------------------------------------------------------------------|
+| **Nginx nestrādā pēc restart** | `sudo nginx -t` (pārbauda konfigus) → Salīdzini ar konvertētajiem failiem no `nginx_converted/` |
+| **PHP nestrādā**              | Pārliecinies, ka `php-fpm` ir palaists: `sudo systemctl status php8.1-fpm`    |
+| **SSL kļūdas**                | Atjaunini sertifikātus: `sudo certbot --nginx -d tavs_domēns.lv`              |
+| **403 Forbidden (statiskie faili)** | Pārbauda `root` ceļu Nginx konfigā un failu atļaujas (`chmod -R 755 /var/www`) |
+
+---
+
+### **🌐 Papildu Darbības (Ja Nepieciešams)**
+- **Manuāli pārveido specifiskus Apache noteikumus** (piem., `.htaccess`):  
+  ```nginx
+  # Piemērs: Pārraksta .htaccess rewrite noteikumus
+  location / {
+      try_files $uri $uri/ /index.php?$args;
+  }
+  ```
+- **Atjaunini DNS ierakstus**, ja migrē uz citu servera IP.
+
+---
+
+### **✅ Gatavs!**  
+Ja viss izdarīts pareizi, jaunajā serverī būs:  
+- **Nginx** (nevis Apache)  
+- **Visi domēni un SSL sertifikāti**  
+- **Cron uzdevumi un atslēgas**  
+
+Ja kaut kas nav skaidrs, raksti! 🚀
