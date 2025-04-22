@@ -1,324 +1,424 @@
-### **🛠️ Apvienotais Backup & Restore Skripts (Viss vienā!)**
-Lai izvairītos no konfliktiem un vienkāršotu procesu, es apvienoju visus 4 skriptus vienā:
+**🛠️ Unified Backup & Restore Script (All in One!)**
 
-#### **📌 1. `full_server_backup.sh`** (Backupo VISU: atslēgas, hostname, SSL, timezone, web konfigus)
-```bash
+To avoid conflicts and simplify the process, I've combined all 4 scripts into one:
+
+#### **📌 1. `full_server_backup.sh`** (Backs up EVERYTHING: keys, hostname, SSL, timezone, web configs)
+
+Bash
+
+```
 #!/bin/bash
 # =========================================
-# UNIVERSĀLAIS SERVERA BACKUP (Viss 1 failā)
+# UNIVERSAL SERVER BACKUP (All in 1 file)
 # =========================================
 
 BACKUP_DIR="/root/full_server_backup_$(date +%Y%m%d)"
 mkdir -p "$BACKUP_DIR"
 
-# 1. Atslēgas un konfigi (~/.ssh, ~/.config, Docker, Git, GPG, cron)
+# 1. Keys and configs (~/.ssh, ~/.config, Docker, Git, GPG, cron)
 mkdir -p "$BACKUP_DIR/keys"
 cp -r ~/.ssh "$BACKUP_DIR/keys/"
 cp ~/.gitconfig "$BACKUP_DIR/keys/" 2>/dev/null
 gpg --export-secret-keys > "$BACKUP_DIR/keys/gpg_private.keys" 2>/dev/null
 crontab -l > "$BACKUP_DIR/keys/crontab.txt" 2>/dev/null
 
-# 2. Servera iestatījumi (hostname, timezone)
+# 2. Server settings (hostname, timezone)
 cp /etc/hostname "$BACKUP_DIR/"
 timedatectl | grep "Time zone" | awk '{print $3}' > "$BACKUP_DIR/timezone"
 
-# 3. SSL sertifikāti (Let's Encrypt + custom)
+# 3. SSL certificates (Let's Encrypt + custom)
 mkdir -p "$BACKUP_DIR/ssl"
 [ -d "/etc/letsencrypt" ] && cp -r /etc/letsencrypt "$BACKUP_DIR/ssl/"
 [ -d "/etc/ssl/custom" ] && cp -r /etc/ssl/custom "$BACKUP_DIR/ssl/"
 
-# 4. Web serveris (Nginx/Apache)
+# 4. Web server (Nginx/Apache)
 mkdir -p "$BACKUP_DIR/web"
 [ -d "/etc/nginx" ] && cp -r /etc/nginx "$BACKUP_DIR/web/"
 [ -d "/etc/apache2" ] && cp -r /etc/apache2 "$BACKUP_DIR/web/"
 
-# 5. Izveido arhīvu
+# 5. Create archive
 tar -czvf "/root/full_server_backup_$(date +%Y%m%d).tar.gz" "$BACKUP_DIR" >/dev/null
 rm -rf "$BACKUP_DIR"
 
 echo "✅ FULL BACKUP: /root/full_server_backup_$(date +%Y%m%d).tar.gz"
-echo "📥 Lejupielāde: scp root@server:/root/full_server_backup_*.tar.gz ."
+echo "📥 Download: scp root@server:/root/full_server_backup_*.tar.gz ."
 ```
 
-#### **📌 2. `full_server_restore.sh`** (Atjauno VISU no backup)
-```bash
+#### **📌 2. `full_server_restore.sh`** (Restores EVERYTHING from backup)
+
+Bash
+
+```
 #!/bin/bash
 # =========================================
-# UNIVERSĀLAIS SERVERA RESTORE (Viss no 1 faila)
+# UNIVERSAL SERVER RESTORE (All from 1 file)
 # =========================================
 
-[ -z "$1" ] && echo "❌ Lietojums: $0 full_server_backup_YYYYMMDD.tar.gz" && exit 1
+[ -z "$1" ] && echo "❌ Usage: $0 full_server_backup_YYYYMMDD.tar.gz" && exit 1
 
 BACKUP_FILE="$1"
 RESTORE_DIR="/tmp/full_restore_$(date +%s)"
 mkdir -p "$RESTORE_DIR"
 tar -xzvf "$BACKUP_FILE" -C "$RESTORE_DIR" >/dev/null
 
-# 1. Atjauno atslēgas
+# 1. Restore keys
 cp -r "$RESTORE_DIR"/keys/.ssh ~/
 cp "$RESTORE_DIR"/keys/.gitconfig ~/ 2>/dev/null
 gpg --import "$RESTORE_DIR/keys/gpg_private.keys" 2>/dev/null
 crontab "$RESTORE_DIR/keys/crontab.txt" 2>/dev/null
 
-# 2. Atjauno servera iestatījumus
+# 2. Restore server settings
 cp "$RESTORE_DIR/hostname" /etc/hostname
 hostname -F /etc/hostname
 timedatectl set-timezone "$(cat $RESTORE_DIR/timezone)"
 
-# 3. Atjauno SSL
+# 3. Restore SSL
 [ -d "$RESTORE_DIR/ssl/letsencrypt" ] && cp -r "$RESTORE_DIR/ssl/letsencrypt" /etc/
 [ -d "$RESTORE_DIR/ssl/custom" ] && cp -r "$RESTORE_DIR/ssl/custom" /etc/ssl/
 
-# 4. Atjauno web serveri
+# 4. Restore web server
 [ -d "$RESTORE_DIR/web/nginx" ] && cp -r "$RESTORE_DIR/web/nginx" /etc/
 [ -d "$RESTORE_DIR/web/apache2" ] && cp -r "$RESTORE_DIR/web/apache2" /etc/
 
-# 5. Restartē servisus
+# 5. Restart services
 systemctl restart nginx apache2 sshd crond 2>/dev/null
 certbot renew --dry-run 2>/dev/null
 
 rm -rf "$RESTORE_DIR"
-echo "✅ FULL RESTORE PABEIGTS! Restartē serveri: reboot"
+echo "✅ FULL RESTORE COMPLETED! Restart the server: reboot"
 ```
 
----
+------
 
-### **⭐ Galvenās priekšrocības:**
-1. **Viss 1 failā** - nav vairs 4 atsevišķi backupi
-2. **Nekonfliktē** - skripti darbosies secīgi, nevis pārrakstīs viens otru
-3. **Vienkārša migrācija** starp serveriem
+### **⭐ Key Advantages:**
 
----
+1. **All in 1 file** - no more 4 separate backups
+2. **No conflicts** - scripts run sequentially, not overwriting each other
+3. **Simple migration** between servers
 
-### **📚 Lietošanas instrukcija:**
+------
+
+### **📚 Usage Instructions:**
+
 #### **Backup:**
-```bash
+
+Bash
+
+```
 chmod +x full_server_backup.sh
-./full_server_backup.sh  # Izveido /root/full_server_backup_YYYYMMDD.tar.gz
+./full_server_backup.sh  # Creates /root/full_server_backup_YYYYMMDD.tar.gz
 ```
 
 #### **Restore:**
-```bash
-scp full_server_backup_YYYYMMDD.tar.gz jaunais_serveris:/root/
+
+Bash
+
+```
+scp full_server_backup_YYYYMMDD.tar.gz new_server:/root/
 chmod +x full_server_restore.sh
 ./full_server_restore.sh full_server_backup_YYYYMMDD.tar.gz
 reboot
 ```
 
----
+------
 
-### **🔐 Drošības padomi:**
-1. **Šifrē backup** pirms pārsūtīšanas:
-   ```bash
+### **🔐 Security Tips:**
+
+1. Encrypt the backup
+
+    before transferring:
+
+   Bash
+
+   ```
    gpg -c full_server_backup_YYYYMMDD.tar.gz
    ```
-2. **Pārliecinies**, ka jaunajam serverim ir:
-   - Tāds pats OS (Ubuntu/Debian/CentOS)
-   - Instalēti pamata pakotnes (nginx, certbot u.c.)
 
+2. Make sure
 
+    the new server has:
 
-### **🔄 Izmaiņas, ja pāriet no Apache uz Nginx (backup/restore kontekstā)**
+   - The same OS (Ubuntu/Debian/CentOS)
+   - Basic packages installed (nginx, certbot, etc.)
 
-Ja vecajā serverī bija **Apache**, bet jaunajā instalē **Nginx**, ir vajadzīgas šādas korekcijas, lai migrācija notiktu bez problēmām:
+### **🔄 Changes If Migrating from Apache to Nginx (in the context of backup/restore)**
 
----
+If the old server had **Apache**, but the new one has **Nginx** installed, the following adjustments are needed for a smooth migration:
 
-## **1. Backup Pielāgojumi (`full_server_backup.sh`)**
-Pievieno **konversijas filtrus**, lai automātiski pārveidotu Apache konfigus uz Nginx saderīgu formātu:
+------
 
-```bash
+## **1. Backup Adjustments (`full_server_backup.sh`)**
+
+Add **conversion filters** to automatically convert Apache configs to Nginx-compatible format:
+
+Bash
+
+```
 # =====[ WEB SERVER BACKUP ]=====
-# Pārveido Apache -> Nginx (ja konfigi eksistē)
+# Convert Apache -> Nginx (if configs exist)
 if [ -d "/etc/apache2" ]; then
-  echo "🔵 Konvertē Apache konfigus uz Nginx formātu..."
+  echo "🔵 Converting Apache configs to Nginx format..."
   mkdir -p "$BACKUP_DIR/web/nginx_converted"
   for site in $(ls /etc/apache2/sites-available/); do
     if [ "$site" != "000-default.conf" ]; then
-      # Izmanto 'apache2nginx' rīku (instalējam to pirms backup)
+      # Use 'apache2nginx' tool (install it before backup)
       apache2nginx /etc/apache2/sites-available/$site > "$BACKUP_DIR/web/nginx_converted/${site}.nginx" 2>/dev/null
     fi
   done
 fi
 ```
 
-### **Obligāti darbības pirms backup:**
-1. Instalē **apache2nginx** rīku:
-   ```bash
+### **Mandatory actions before backup:**
+
+1. Install the 
+
+   apache2nginx
+
+    tool:
+
+   Bash
+
+   ```
    sudo apt install -y apache2-utils  # Debian/Ubuntu
    sudo yum install -y httpd-tools    # CentOS
    ```
 
----
+------
 
-## **2. Restore Pielāgojumi (`full_server_restore.sh`)**
-Aizstāj Apache konfigus ar pārveidotajiem Nginx failiem:
+## **2. Restore Adjustments (`full_server_restore.sh`)**
 
-```bash
+Replace Apache configs with the converted Nginx files:
+
+Bash
+
+```
 # =====[ WEB SERVER RESTORE ]=====
-# Ja ir pārveidoti Nginx konfigi no Apache
+# If there are converted Nginx configs from Apache
 if [ -d "$RESTORE_DIR/web/nginx_converted" ]; then
-  echo "🔵 Instalē pārveidotos Nginx konfigus..."
-  sudo apt install -y nginx  # Ja vēl nav instalēts
+  echo "🔵 Installing converted Nginx configs..."
+  sudo apt install -y nginx  # If not already installed
   mkdir -p /etc/nginx/conf.d
   cp "$RESTORE_DIR"/web/nginx_converted/*.nginx /etc/nginx/conf.d/
   
-  # Pārbauda un restartē
+  # Check and restart
   sudo nginx -t && sudo systemctl restart nginx
 fi
 ```
 
----
+------
 
-## **3. Būtiskās Izmaiņas Konfigos**
-Nginx neizprot Apache direktīvas, tāpēc konvertējot, mainās:
+## **3. Key Changes in Configs**
 
-| **Apache Direktīva**       | **Nginx Ekvivalents**          |
-|---------------------------|-------------------------------|
-| `DocumentRoot /path`      | `root /path;`                |
-| `<VirtualHost *:80>`      | `server { listen 80; ... }`  |
-| `ErrorLog logs/error.log` | `error_log /path/error.log;` |
+Nginx doesn't understand Apache directives, so during conversion, the following changes:
+
+| **Apache Directive**                        | **Nginx Equivalent**                    |
+| ------------------------------------------- | --------------------------------------- |
+| `DocumentRoot /path`                        | `root /path;`                           |
+| `<VirtualHost *:80>`                        | `server { listen 80; ... }`             |
+| `ErrorLog logs/error.log`                   | `error_log /path/error.log;`            |
 | `RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]` | `rewrite ^/(.*)$ /index.php?q=$1 last;` |
 
----
+------
 
-## **4. Manuālie Pārbaudes Soļi Pēc Restore**
-1. **Pārbauda, vai Nginx apstrādā PHP**:
-   ```nginx
+## **4. Manual Verification Steps After Restore**
+
+1. Verify if Nginx is processing PHP
+
+   :
+
+   Nginx
+
+   ```
    location ~ \.php$ {
      fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
      include fastcgi_params;
    }
    ```
-2. **Atjaunina SSL sertifikātu ceļus** (ja bija Apache `SSLCertificateFile`):
-   ```nginx
+
+2. Update SSL certificate paths
+
+    (if there was Apache 
+
+   ```
+   SSLCertificateFile
+   ```
+
+   ):
+
+   Nginx
+
+   ```
    ssl_certificate /etc/letsencrypt/live/domains/fullchain.pem;
    ssl_certificate_key /etc/letsencrypt/live/domains/privkey.pem;
    ```
-3. **Pārliecinies, ka statiskie faili tiek apkalpoti**:
-   ```nginx
+
+3. Make sure static files are served
+
+   :
+
+   Nginx
+
+   ```
    location /static/ {
      alias /var/www/html/static/;
    }
    ```
 
----
+------
 
-## **5. Pilns Migrācijas Process**
-```mermaid
+## **5. Full Migration Process**
+
+Code snippet
+
+```
 flowchart TD
-    A[Veic pilnu backup ar full_server_backup.sh] --> B[Konvertē Apache konfigus uz Nginx]
-    B --> C[Instalē Nginx jaunajā serverī]
-    C --> D[Restore no backup ar full_server_restore.sh]
-    D --> E[Pārbauda žurnālus: journalctl -u nginx -f]
+    A[Perform full backup with full_server_backup.sh] --> B[Convert Apache configs to Nginx]
+    B --> C[Install Nginx on the new server]
+    C --> D[Restore from backup with full_server_restore.sh]
+    D --> E[Check logs: journalctl -u nginx -f]
 ```
 
----
+------
 
-### **⚠️ Svarīgi!**
-- **Neaizstāj vienlaikus abus serverus** — vispirms pārbaudi jauno konfigurāciju.  
-- **Izmanto `nginx -t` pirms restartēšanas**, lai pārbaudītu sintakses kļūdas.  
-- **Migrē pa vienam domēnam**, nevis visus uzreiz.  
+### **⚠️ Important!**
 
-Ja rodas kļūdas, pārbaudi:  
-```bash
+- **Don't replace both servers at the same time** — test the new configuration first.
+- **Use `nginx -t` before restarting** to check for syntax errors.
+- **Migrate one domain at a time**, not all at once.
+
+If errors occur, check:
+
+Bash
+
+```
 sudo tail -100 /var/log/nginx/error.log
 ```
 
+### **🔧 Commands for Migration with Your GitHub Repository**
 
-### **🔧 Komandas Migrācijai ar Jūsu GitHub Repozitoriju**  
-Tā kā esat ievietojis backup/restore skriptus GitHub ([Trusardi/server_backup_restore](https://github.com/Trusardi/server_backup_restore)), šeit ir **konkrētas komandas**, lai migrētu no vecā servera (ar Apache) uz jauno (ar Nginx):
+Since you've placed the backup/restore scripts on GitHub ([Trusardi/server_backup_restore](https://www.google.com/search?q=https://github.com/Trusardi/server_backup_restore)), here are **specific commands** to migrate from the old server (with Apache) to the new one (with Nginx):
 
----
+------
 
-## **1. Vecajā Serverī (Backup)**
-#### **Lejupielādē un palaid backup skriptu no GitHub:**
-```bash
-# Lejupielādē skriptus no GitHub
+## **1. On the Old Server (Backup)**
+
+#### **Download and run the backup script from GitHub:**
+
+Bash
+
+```
+# Download scripts from GitHub
 git clone git@github.com:Trusardi/server_backup_restore.git
 cd server_backup_restore
 
-# Padara skriptus izpildāmus
+# Make scripts executable
 chmod +x full_server_backup.sh
 
-# Instalē nepieciešamos rīkus (Apache -> Nginx konversijai)
+# Install necessary tools (for Apache -> Nginx conversion)
 sudo apt install -y apache2-utils  # Debian/Ubuntu
 sudo yum install -y httpd-tools    # CentOS
 
-# Palaid pilnu backup (ar Apache konfigu konversiju uz Nginx)
+# Run full backup (with Apache config conversion to Nginx)
 ./full_server_backup.sh
 ```
-**Rezultāts:**  
-Backup fails tiks saglabāts vecajā serverī:  
-`/root/full_server_backup_YYYYMMDD.tar.gz`
 
----
+Result:
 
-## **2. Jaunajā Serverī (Restore)**
-#### **Lejupielādē backup un palaid restore:**
-```bash
-# Lejupielādē skriptus no GitHub
+The backup file will be saved on the old server:
+
+/root/full_server_backup_YYYYMMDD.tar.gz
+
+------
+
+## **2. On the New Server (Restore)**
+
+#### **Download the backup and run restore:**
+
+Bash
+
+```
+# Download scripts from GitHub
 git clone git@github.com:Trusardi/server_backup_restore.git
 cd server_backup_restore
 chmod +x full_server_restore.sh
 
-# Lejupielādē backup failu no vecā servera (izmantojot SCP)
-scp root@vecais_serveris:/root/full_server_backup_*.tar.gz .
+# Download the backup file from the old server (using SCP)
+scp root@old_server:/root/full_server_backup_*.tar.gz .
 
-# Palaid restore (ar Nginx konfigiem)
+# Run restore (with Nginx configs)
 ./full_server_restore.sh full_server_backup_YYYYMMDD.tar.gz
 
-# Pārbauda, vai Nginx strādā
+# Check if Nginx is working
 sudo nginx -t && sudo systemctl restart nginx
 ```
 
----
+------
 
-## **3. Pārbaudes Pēc Migrācijas**
-#### **Pārliecinies, ka viss darbojas:**
-```bash
-# Pārbauda Nginx kļūdas
+## **3. Post-Migration Checks**
+
+#### **Make sure everything is working:**
+
+Bash
+
+```
+# Check Nginx errors
 sudo tail -100 /var/log/nginx/error.log
 
-# Pārbauda, vai PHP darbojas (ja ir)
+# Check if PHP is working (if applicable)
 curl -I http://localhost/index.php
 
-# Pārbauda SSL sertifikātus
+# Check SSL certificates
 sudo certbot renew --dry-run
 
-# Pārbauda cron uzdevumus
+# Check cron jobs
 crontab -l
 ```
 
----
+------
 
-## **4. Ja Rodas Problēmas**
-#### **Biežākās kļūdas un risinājumi:**
-| **Problēma**                  | **Risinājums**                                                                 |
-|-------------------------------|-------------------------------------------------------------------------------|
-| **Nginx nestrādā pēc restart** | `sudo nginx -t` (pārbauda konfigus) → Salīdzini ar konvertētajiem failiem no `nginx_converted/` |
-| **PHP nestrādā**              | Pārliecinies, ka `php-fpm` ir palaists: `sudo systemctl status php8.1-fpm`    |
-| **SSL kļūdas**                | Atjaunini sertifikātus: `sudo certbot --nginx -d tavs_domēns.lv`              |
-| **403 Forbidden (statiskie faili)** | Pārbauda `root` ceļu Nginx konfigā un failu atļaujas (`chmod -R 755 /var/www`) |
+## **4. If Problems Arise**
 
----
+#### **Common errors and solutions:**
 
-### **🌐 Papildu Darbības (Ja Nepieciešams)**
-- **Manuāli pārveido specifiskus Apache noteikumus** (piem., `.htaccess`):  
-  ```nginx
-  # Piemērs: Pārraksta .htaccess rewrite noteikumus
+| **Problem**                         | **Solution**                                                 |
+| ----------------------------------- | ------------------------------------------------------------ |
+| **Nginx not working after restart** | `sudo nginx -t` (check configs) → Compare with converted files from `nginx_converted/` |
+| **PHP not working**                 | Make sure `php-fpm` is running: `sudo systemctl status php8.1-fpm` |
+| **SSL errors**                      | Renew certificates: `sudo certbot --nginx -d your_domain.lv` |
+| **403 Forbidden (static files)**    | Check `root` path in Nginx config and file permissions (`chmod -R 755 /var/www`) |
+
+------
+
+### **🌐 Additional Actions (If Necessary)**
+
+- Manually convert specific Apache rules
+
+   (e.g., 
+
+  ```
+  .htaccess
+  ```
+
+  ):
+
+  Nginx
+
+  ```
+  # Example: Rewrite .htaccess rewrite rules
   location / {
       try_files $uri $uri/ /index.php?$args;
   }
   ```
-- **Atjaunini DNS ierakstus**, ja migrē uz citu servera IP.
 
----
+- **Update DNS records** if migrating to a different server IP.
 
-### **✅ Gatavs!**  
-Ja viss izdarīts pareizi, jaunajā serverī būs:  
-- **Nginx** (nevis Apache)  
-- **Visi domēni un SSL sertifikāti**  
-- **Cron uzdevumi un atslēgas**  
+------
 
-Ja kaut kas nav skaidrs, raksti! 🚀
+### **✅ Done!**
+
+If everything is done correctly, the new server will have:
+
+- **Nginx** (instead of Apache)
+- **All domains and SSL certificates**
+- **Cron jobs and keys**
+
