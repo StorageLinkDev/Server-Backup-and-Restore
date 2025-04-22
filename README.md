@@ -296,7 +296,7 @@ sudo tail -100 /var/log/nginx/error.log
 
 ### **🔧 Commands for Migration with Your GitHub Repository**
 
-Since you've placed the backup/restore scripts on GitHub ([Trusardi/server_backup_restore](https://www.google.com/search?q=https://github.com/Trusardi/server_backup_restore)), here are **specific commands** to migrate from the old server (with Apache) to the new one (with Nginx):
+Since you've placed the backup/restore scripts on GitHub ([StorageLinkDev/Server-Backup-and-Restore](https://www.google.com/search?q=https://github.com/StorageLinkDev/Server-Backup-and-Restore)), here are **specific commands** to migrate from the old server (with Apache) to the new one (with Nginx):
 
 ------
 
@@ -308,7 +308,7 @@ Bash
 
 ```
 # Download scripts from GitHub
-git clone git@github.com:Trusardi/server_backup_restore.git
+git clone git@github.com:StorageLinkDev/Server-Backup-and-Restore.git
 cd server_backup_restore
 
 # Make scripts executable
@@ -338,7 +338,7 @@ Bash
 
 ```
 # Download scripts from GitHub
-git clone git@github.com:Trusardi/server_backup_restore.git
+git clone git@github.com:StorageLinkDev/Server-Backup-and-Restore.git
 cd server_backup_restore
 chmod +x full_server_restore.sh
 
